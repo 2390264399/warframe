@@ -1,0 +1,39 @@
+name: Fetch Warframe data
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch
+        run: |
+          mkdir -p data
+          if curl -fsSL --max-time 30 -A "Mozilla/5.0" "https://api.warframestat.us/pc?language=zh" -o data/worldstate.json; then
+            echo "source=warframestat" > data/meta.txt
+          else
+            curl -fsSL --max-time 30 -A "Mozilla/5.0" "https://api.warframe.com/cdn/worldState.php" -o data/worldstate.json
+            echo "source=official" > data/meta.txt
+          fi
+          python3 -c "import json; json.load(open('data/worldstate.json')); print('json ok')"
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "data: update $(date -u +%FT%TZ)"
+            git push
+          fi
